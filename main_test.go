@@ -53,6 +53,46 @@ func TestWaitForVault_VaultUp(t *testing.T) {
 	mockVault.AssertCalled(t, "HealthCheck")
 }
 
+func TestInitializeVault_InitializationError(t *testing.T) {
+	mockVault := new(mocking.VaultMock)
+	vaultClient = mockVault
+
+	mockVault.On("Initialize").Once().Return(vault.InitResponse{}, fmt.Errorf("Failed to initialize Vault"))
+
+	InitializeVault()
+	mockVault.AssertCalled(t, "Initialize")
+	mockVault.AssertNotCalled(t, "Unseal", mock.Anything)
+}
+
+func TestInitializeVault_UnsealKeys(t *testing.T) {
+	mockVault := new(mocking.VaultMock)
+	vaultClient = mockVault
+
+	keys := []string{"a", "b", "c", "d", "e", "f", "g", "h"}
+
+	mockVault.On("Initialize").Once().Return(vault.InitResponse{Keys: keys}, nil)
+	mockVault.On("Unseal").Times(6).Return(vault.UnsealState{Sealed: true}, nil)
+	mockVault.On("Unseal").Once().Return(vault.UnsealState{Sealed: false}, nil)
+
+	InitializeVault()
+	mockVault.AssertCalled(t, "Initialize")
+	mockVault.AssertNumberOfCalls(t, "Unseal", 7)
+}
+
+func TestInitializeVault_UnsealError(t *testing.T) {
+	mockVault := new(mocking.VaultMock)
+	vaultClient = mockVault
+
+	keys := []string{"a", "b", "c"}
+
+	mockVault.On("Initialize").Once().Return(vault.InitResponse{Keys: keys}, nil)
+	mockVault.On("Unseal").Return(vault.UnsealState{Sealed: true}, fmt.Errorf("Unseal mock error"))
+
+	InitializeVault()
+	mockVault.AssertCalled(t, "Initialize")
+	mockVault.AssertNumberOfCalls(t, "Unseal", len(keys))
+}
+
 func TestGetVaultAddress_EmptyString(t *testing.T) {
 	os.Setenv("VAULT_ADDR", "")
 	assert.Equal(t, DEFAULT_VAULT_ADDR, GetVaultAddress(), "Expected the default vault address")

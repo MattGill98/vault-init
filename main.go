@@ -60,7 +60,8 @@ func InitializeVault() {
 
 	response, err := vaultClient.Initialize()
 	if err != nil {
-		log.Fatalf("Initialization error: %q", err)
+		log.Printf("Initialization error: %q", err)
+		return
 	}
 
 	log.Println("Unsealing Vault...")
@@ -68,7 +69,7 @@ func InitializeVault() {
 		event, err := vaultClient.Unseal(key)
 		if err != nil {
 			log.Printf("Failed to unseal using key [%d]", index)
-			break
+			continue
 		}
 		log.Printf("Unseal progress: [%d/%d]", event.KeysProvided, event.KeysRequired)
 		if !event.Sealed {
