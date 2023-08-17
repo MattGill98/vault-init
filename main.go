@@ -5,54 +5,34 @@ import (
 	"os"
 	"time"
 
-	vault "github.com/mattgill98/vault-init/pkg/client"
+	"github.com/mattgill98/vault-init/pkg/vault"
 )
 
 const (
-	DEFAULT_VAULT_ADDR     = "http://127.0.0.1:8200"
-	DEFAULT_CHECK_INTERVAL = 1000
+	DEFAULT_VAULT_ADDR = "http://127.0.0.1:8200"
+)
+
+var (
+	vaultClient vault.Vault
 )
 
 func main() {
-	vaultAddr := os.Getenv("VAULT_ADDR")
-	if vaultAddr == "" {
-		log.Printf("VAULT_ADDR not set, defaulting to %q", DEFAULT_VAULT_ADDR)
-		vaultAddr = DEFAULT_VAULT_ADDR
-	}
+	address := GetVaultAddress()
+	vaultClient = vault.NewVaultClient(address)
 
-	vault := vault.NewVaultClient(vaultAddr)
-	configure(vault)
+	vaultState := WaitForVault()
+
+	if vaultState.Uninitialized {
+		InitializeVault()
+	}
 }
 
-func configure(vault vault.Vault) {
-
-	initialize := func() {
-		log.Println("Initialising Vault...")
-
-		response, err := vault.Initialize()
-		if err != nil {
-			log.Fatalf("Initialization error: %q", err)
-		}
-
-		log.Println("Unsealing Vault...")
-		for index, key := range response.Keys {
-			event, err := vault.Unseal(key)
-			if err != nil {
-				log.Printf("Failed to unseal using key [%d]", index)
-				break
-			}
-			log.Printf("Unseal progress: [%d/%d]", event.KeysProvided, event.KeysRequired)
-			if !event.Sealed {
-				break
-			}
-		}
-	}
-
+func WaitForVault() vault.HealthResponse {
 	for {
-		state, err := vault.HealthCheck()
+		state, err := vaultClient.HealthCheck()
 		if err != nil {
 			log.Println(err)
-			time.Sleep(DEFAULT_CHECK_INTERVAL * time.Millisecond)
+			time.Sleep(1 * time.Second)
 			continue
 		}
 
@@ -63,13 +43,43 @@ func configure(vault vault.Vault) {
 			log.Println("Vault is unsealed and in standby mode.")
 		case state.Uninitialized:
 			log.Println("Vault is not initialized.")
-			initialize()
 		case state.Sealed:
 			log.Println("Vault is sealed.")
 		default:
 			log.Printf("Vault is in an unknown state. Status code: %d", state.StatusCode)
 		}
 
-		break
+		return *state
 	}
+}
+
+func InitializeVault() {
+	log.Println("Initialising Vault...")
+
+	response, err := vaultClient.Initialize()
+	if err != nil {
+		log.Fatalf("Initialization error: %q", err)
+	}
+
+	log.Println("Unsealing Vault...")
+	for index, key := range response.Keys {
+		event, err := vaultClient.Unseal(key)
+		if err != nil {
+			log.Printf("Failed to unseal using key [%d]", index)
+			break
+		}
+		log.Printf("Unseal progress: [%d/%d]", event.KeysProvided, event.KeysRequired)
+		if !event.Sealed {
+			break
+		}
+	}
+}
+
+func GetVaultAddress() string {
+	vaultAddr := os.Getenv("VAULT_ADDR")
+	if vaultAddr != "" {
+		return vaultAddr
+	}
+	log.Printf("VAULT_ADDR not set, defaulting to %q", DEFAULT_VAULT_ADDR)
+	return DEFAULT_VAULT_ADDR
 }

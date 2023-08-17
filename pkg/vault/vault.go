@@ -1,4 +1,4 @@
-package client
+package vault
 
 import (
 	"bytes"
@@ -18,43 +18,6 @@ type Vault interface {
 type vaultClient struct {
 	address    string
 	httpClient http.Client
-}
-
-type HealthResponse struct {
-	Active        bool
-	Standby       bool
-	Uninitialized bool
-	Sealed        bool
-	StatusCode    int
-}
-
-type InitRequest struct {
-	SecretShares    int `json:"secret_shares"`
-	SecretThreshold int `json:"secret_threshold"`
-}
-
-type InitResponse struct {
-	Keys       []string `json:"keys"`
-	KeysBase64 []string `json:"keys_base64"`
-	RootToken  string   `json:"root_token"`
-}
-
-type UnsealRequest struct {
-	Key   string `json:"key"`
-	Reset bool   `json:"reset"`
-}
-
-type UnsealResponse struct {
-	Sealed   bool `json:"sealed"`
-	T        int  `json:"t"`
-	N        int  `json:"n"`
-	Progress int  `json:"progress"`
-}
-
-type UnsealEvent struct {
-	Sealed       bool
-	KeysProvided int
-	KeysRequired int
 }
 
 func NewVaultClient(address string) Vault {
