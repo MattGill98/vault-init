@@ -31,7 +31,15 @@ func main() {
 }
 
 func GetStorage() secret.KeyStorage {
-	return secret.NewMemorySecretStorage(log.Default())
+	kubeStorage, err := secret.NewKubernetesSecretStorage("vault-keys", "default")
+	if kubeStorage != nil {
+		return kubeStorage
+	}
+	if err == secret.ErrNotInCluster {
+		log.Println("No Kubernetes environment detected")
+		return secret.NewMemorySecretStorage(log.Default())
+	}
+	panic(err.Error())
 }
 
 func WaitForVault(delay func(d time.Duration)) vault.HealthState {
