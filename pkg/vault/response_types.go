@@ -27,6 +27,11 @@ type UnsealResponse struct {
 
 // Custom client results
 
+type InitState struct {
+	Keys      []string
+	RootToken string
+}
+
 type UnsealState struct {
 	Sealed       bool
 	KeysProvided int

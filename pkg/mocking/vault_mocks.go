@@ -13,9 +13,9 @@ func (m *VaultMock) HealthCheck() (vault.HealthState, error) {
 	args := m.Called()
 	return args.Get(0).(vault.HealthState), args.Error(1)
 }
-func (m *VaultMock) Initialize() (vault.InitResponse, error) {
+func (m *VaultMock) Initialize() (vault.InitState, error) {
 	args := m.Called()
-	return args.Get(0).(vault.InitResponse), args.Error(1)
+	return args.Get(0).(vault.InitState), args.Error(1)
 }
 func (m *VaultMock) Unseal(key string) (vault.UnsealState, error) {
 	args := m.Called()

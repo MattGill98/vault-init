@@ -11,7 +11,7 @@ import (
 
 type Vault interface {
 	HealthCheck() (HealthState, error)
-	Initialize() (InitResponse, error)
+	Initialize() (InitState, error)
 	Unseal(string) (UnsealState, error)
 }
 
@@ -56,7 +56,7 @@ func (vaultClient *vaultClient) HealthCheck() (HealthState, error) {
 	}
 }
 
-func (vaultClient *vaultClient) Initialize() (InitResponse, error) {
+func (vaultClient *vaultClient) Initialize() (InitState, error) {
 	endpoint := fmt.Sprintf("%v/v1/sys/init", vaultClient.address)
 	request := InitRequest{
 		SecretShares:    5,
@@ -65,10 +65,10 @@ func (vaultClient *vaultClient) Initialize() (InitResponse, error) {
 
 	var response InitResponse
 	if err := vaultRequest[InitRequest, *InitResponse](vaultClient, http.MethodPut, endpoint, request, &response); err != nil {
-		return InitResponse{}, err
+		return InitState{}, err
 	}
 
-	return response, nil
+	return InitState{Keys: response.Keys, RootToken: response.RootToken}, nil
 }
 
 func (vaultClient *vaultClient) Unseal(key string) (UnsealState, error) {

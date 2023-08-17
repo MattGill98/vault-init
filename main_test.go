@@ -57,7 +57,7 @@ func TestInitializeVault_InitializationError(t *testing.T) {
 	mockVault := new(mocking.VaultMock)
 	vaultClient = mockVault
 
-	mockVault.On("Initialize").Once().Return(vault.InitResponse{}, fmt.Errorf("Failed to initialize Vault"))
+	mockVault.On("Initialize").Once().Return(vault.InitState{}, fmt.Errorf("Failed to initialize Vault"))
 
 	InitializeVault()
 	mockVault.AssertCalled(t, "Initialize")
@@ -70,7 +70,7 @@ func TestInitializeVault_UnsealKeys(t *testing.T) {
 
 	keys := []string{"a", "b", "c", "d", "e", "f", "g", "h"}
 
-	mockVault.On("Initialize").Once().Return(vault.InitResponse{Keys: keys}, nil)
+	mockVault.On("Initialize").Once().Return(vault.InitState{Keys: keys}, nil)
 	mockVault.On("Unseal").Times(6).Return(vault.UnsealState{Sealed: true}, nil)
 	mockVault.On("Unseal").Once().Return(vault.UnsealState{Sealed: false}, nil)
 
@@ -85,7 +85,7 @@ func TestInitializeVault_UnsealError(t *testing.T) {
 
 	keys := []string{"a", "b", "c"}
 
-	mockVault.On("Initialize").Once().Return(vault.InitResponse{Keys: keys}, nil)
+	mockVault.On("Initialize").Once().Return(vault.InitState{Keys: keys}, nil)
 	mockVault.On("Unseal").Return(vault.UnsealState{Sealed: true}, fmt.Errorf("Unseal mock error"))
 
 	InitializeVault()
