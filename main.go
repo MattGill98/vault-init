@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/mattgill98/vault-init/pkg/secret"
 	"github.com/mattgill98/vault-init/pkg/vault"
 )
 
@@ -27,6 +28,10 @@ func main() {
 	if vaultState.Uninitialized {
 		InitializeVault()
 	}
+}
+
+func GetStorage() secret.KeyStorage {
+	return secret.NewMemorySecretStorage(log.Default())
 }
 
 func WaitForVault(delay func(d time.Duration)) vault.HealthState {
@@ -58,14 +63,17 @@ func WaitForVault(delay func(d time.Duration)) vault.HealthState {
 func InitializeVault() {
 	log.Println("Initialising Vault...")
 
-	response, err := vaultClient.Initialize()
+	state, err := vaultClient.Initialize()
 	if err != nil {
 		log.Printf("Initialization error: %q", err)
 		return
 	}
 
+	log.Println("Storing Vault keys...")
+	GetStorage().Persist(state)
+
 	log.Println("Unsealing Vault...")
-	for index, key := range response.Keys {
+	for index, key := range state.Keys {
 		event, err := vaultClient.Unseal(key)
 		if err != nil {
 			log.Printf("Failed to unseal using key [%d]", index)
