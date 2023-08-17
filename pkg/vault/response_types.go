@@ -1,12 +1,6 @@
 package vault
 
-type HealthResponse struct {
-	Active        bool
-	Standby       bool
-	Uninitialized bool
-	Sealed        bool
-	StatusCode    int
-}
+// JSON API types
 
 type InitRequest struct {
 	SecretShares    int `json:"secret_shares"`
@@ -31,8 +25,18 @@ type UnsealResponse struct {
 	Progress int  `json:"progress"`
 }
 
-type UnsealEvent struct {
+// Custom client results
+
+type UnsealState struct {
 	Sealed       bool
 	KeysProvided int
 	KeysRequired int
+}
+
+type HealthState struct {
+	Active        bool
+	Standby       bool
+	Uninitialized bool
+	Sealed        bool
+	StatusCode    int
 }

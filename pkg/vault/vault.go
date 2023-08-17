@@ -10,9 +10,9 @@ import (
 )
 
 type Vault interface {
-	HealthCheck() (*HealthResponse, error)
-	Initialize() (*InitResponse, error)
-	Unseal(string) (*UnsealEvent, error)
+	HealthCheck() (HealthState, error)
+	Initialize() (InitResponse, error)
+	Unseal(string) (UnsealState, error)
 }
 
 type vaultClient struct {
@@ -33,30 +33,30 @@ func NewVaultClient(address string) Vault {
 	}
 }
 
-func (vaultClient *vaultClient) HealthCheck() (*HealthResponse, error) {
+func (vaultClient *vaultClient) HealthCheck() (HealthState, error) {
 	endpoint := fmt.Sprintf("%v/v1/sys/health", vaultClient.address)
 
 	response, err := vaultClient.httpClient.Head(endpoint)
 	if err != nil {
-		return nil, err
+		return HealthState{}, err
 	}
 	defer response.Body.Close()
 
 	switch response.StatusCode {
 	case 200:
-		return &HealthResponse{StatusCode: response.StatusCode, Active: true}, nil
+		return HealthState{StatusCode: response.StatusCode, Active: true}, nil
 	case 429:
-		return &HealthResponse{StatusCode: response.StatusCode, Standby: true}, nil
+		return HealthState{StatusCode: response.StatusCode, Standby: true}, nil
 	case 501:
-		return &HealthResponse{StatusCode: response.StatusCode, Uninitialized: true}, nil
+		return HealthState{StatusCode: response.StatusCode, Uninitialized: true}, nil
 	case 503:
-		return &HealthResponse{StatusCode: response.StatusCode, Sealed: true}, nil
+		return HealthState{StatusCode: response.StatusCode, Sealed: true}, nil
 	default:
-		return &HealthResponse{StatusCode: response.StatusCode}, nil
+		return HealthState{StatusCode: response.StatusCode}, nil
 	}
 }
 
-func (vaultClient *vaultClient) Initialize() (*InitResponse, error) {
+func (vaultClient *vaultClient) Initialize() (InitResponse, error) {
 	endpoint := fmt.Sprintf("%v/v1/sys/init", vaultClient.address)
 	request := InitRequest{
 		SecretShares:    5,
@@ -65,13 +65,13 @@ func (vaultClient *vaultClient) Initialize() (*InitResponse, error) {
 
 	var response InitResponse
 	if err := vaultRequest[InitRequest, *InitResponse](vaultClient, http.MethodPut, endpoint, request, &response); err != nil {
-		return nil, err
+		return InitResponse{}, err
 	}
 
-	return &response, nil
+	return response, nil
 }
 
-func (vaultClient *vaultClient) Unseal(key string) (*UnsealEvent, error) {
+func (vaultClient *vaultClient) Unseal(key string) (UnsealState, error) {
 	endpoint := fmt.Sprintf("%v/v1/sys/unseal", vaultClient.address)
 	request := UnsealRequest{
 		Key: key,
@@ -79,7 +79,7 @@ func (vaultClient *vaultClient) Unseal(key string) (*UnsealEvent, error) {
 
 	var response UnsealResponse
 	if err := vaultRequest[UnsealRequest, *UnsealResponse](vaultClient, http.MethodPut, endpoint, request, &response); err != nil {
-		return nil, err
+		return UnsealState{}, err
 	}
 
 	target := response.T
@@ -90,7 +90,7 @@ func (vaultClient *vaultClient) Unseal(key string) (*UnsealEvent, error) {
 		progress = response.T
 	}
 
-	return &UnsealEvent{
+	return UnsealState{
 		Sealed:       response.Sealed,
 		KeysProvided: progress,
 		KeysRequired: target,

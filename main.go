@@ -27,7 +27,7 @@ func main() {
 	}
 }
 
-func WaitForVault() vault.HealthResponse {
+func WaitForVault() vault.HealthState {
 	for {
 		state, err := vaultClient.HealthCheck()
 		if err != nil {
@@ -49,7 +49,7 @@ func WaitForVault() vault.HealthResponse {
 			log.Printf("Vault is in an unknown state. Status code: %d", state.StatusCode)
 		}
 
-		return *state
+		return state
 	}
 }
 
