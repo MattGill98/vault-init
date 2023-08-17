@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/mattgill98/vault-init/pkg/client"
+	vault "github.com/mattgill98/vault-init/pkg/client"
 )
 
 const (
@@ -20,12 +20,10 @@ func main() {
 		vaultAddr = DEFAULT_VAULT_ADDR
 	}
 
-	vaultClientConfig := &client.VaultClientConfig{
-		Address: vaultAddr,
-	}
+	vaultClient := vault.NewVaultClient(vaultAddr)
 
 	for {
-		state, err := client.Health(*vaultClientConfig)
+		state, err := vaultClient.HealthCheck()
 		if err != nil {
 			log.Println(err)
 			time.Sleep(DEFAULT_CHECK_INTERVAL * time.Millisecond)
@@ -39,7 +37,7 @@ func main() {
 			log.Println("Vault is unsealed and in standby mode.")
 		case state.Uninitialized:
 			log.Println("Vault is not initialized.")
-			initialize(*vaultClientConfig)
+			configure(vaultClient)
 		case state.Sealed:
 			log.Println("Vault is sealed.")
 		default:
@@ -50,17 +48,17 @@ func main() {
 	}
 }
 
-func initialize(config client.VaultClientConfig) {
+func configure(vault vault.Vault) {
 	log.Println("Initialising Vault...")
 
-	response, err := client.Initialize(config)
+	response, err := vault.Initialize()
 	if err != nil {
 		log.Fatalf("Initialization error: %q", err)
 	}
 
 	log.Println("Unsealing Vault...")
 	for index, key := range response.Keys {
-		event, err := client.Unseal(config, key)
+		event, err := vault.Unseal(key)
 		if err != nil {
 			log.Printf("Failed to unseal using key [%d]", index)
 			break

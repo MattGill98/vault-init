@@ -7,11 +7,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
 )
 
-type VaultClientConfig struct {
-	Address string
+type Vault interface {
+	HealthCheck() (*HealthResponse, error)
+	Initialize() (*InitResponse, error)
+	Unseal(string) (*UnsealEvent, error)
+}
+
+type vaultClient struct {
+	address    string
+	httpClient http.Client
 }
 
 type HealthResponse struct {
@@ -51,34 +57,23 @@ type UnsealEvent struct {
 	KeysRequired int
 }
 
-var (
-	httpClientLock = &sync.Mutex{}
-	httpClient     http.Client
-)
-
-func initClient() http.Client {
-	if &httpClient == nil {
-		httpClientLock.Lock()
-		defer httpClientLock.Unlock()
-		if &httpClient == nil {
-			httpClient = http.Client{
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true,
-					},
+func NewVaultClient(address string) Vault {
+	return &vaultClient{
+		address: address,
+		httpClient: http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
 				},
-			}
-		}
+			},
+		},
 	}
-	return httpClient
 }
 
-func Health(config VaultClientConfig) (*HealthResponse, error) {
-	endpoint := fmt.Sprintf("%v/v1/sys/health", config.Address)
+func (vaultClient *vaultClient) HealthCheck() (*HealthResponse, error) {
+	endpoint := fmt.Sprintf("%v/v1/sys/health", vaultClient.address)
 
-	httpClient = initClient()
-
-	response, err := httpClient.Head(endpoint)
+	response, err := vaultClient.httpClient.Head(endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -98,29 +93,29 @@ func Health(config VaultClientConfig) (*HealthResponse, error) {
 	}
 }
 
-func Initialize(config VaultClientConfig) (*InitResponse, error) {
-	endpoint := fmt.Sprintf("%v/v1/sys/init", config.Address)
+func (vaultClient *vaultClient) Initialize() (*InitResponse, error) {
+	endpoint := fmt.Sprintf("%v/v1/sys/init", vaultClient.address)
 	request := InitRequest{
 		SecretShares:    5,
 		SecretThreshold: 3,
 	}
 
 	var response InitResponse
-	if err := vaultRequest[InitRequest, *InitResponse](http.MethodPut, endpoint, request, &response); err != nil {
+	if err := vaultRequest[InitRequest, *InitResponse](vaultClient, http.MethodPut, endpoint, request, &response); err != nil {
 		return nil, err
 	}
 
 	return &response, nil
 }
 
-func Unseal(config VaultClientConfig, key string) (*UnsealEvent, error) {
-	endpoint := fmt.Sprintf("%v/v1/sys/unseal", config.Address)
+func (vaultClient *vaultClient) Unseal(key string) (*UnsealEvent, error) {
+	endpoint := fmt.Sprintf("%v/v1/sys/unseal", vaultClient.address)
 	request := UnsealRequest{
 		Key: key,
 	}
 
 	var response UnsealResponse
-	if err := vaultRequest[UnsealRequest, *UnsealResponse](http.MethodPut, endpoint, request, &response); err != nil {
+	if err := vaultRequest[UnsealRequest, *UnsealResponse](vaultClient, http.MethodPut, endpoint, request, &response); err != nil {
 		return nil, err
 	}
 
@@ -139,7 +134,7 @@ func Unseal(config VaultClientConfig, key string) (*UnsealEvent, error) {
 	}, nil
 }
 
-func vaultRequest[K any, V any](method string, endpoint string, body K, response V) error {
+func vaultRequest[K any, V any](client *vaultClient, method string, endpoint string, body K, response V) error {
 	requestData, _ := json.Marshal(&body)
 	requestBytes := bytes.NewReader(requestData)
 
@@ -148,9 +143,7 @@ func vaultRequest[K any, V any](method string, endpoint string, body K, response
 		return fmt.Errorf("Error creating request: %w", err)
 	}
 
-	httpClient = initClient()
-
-	httpResponse, err := httpClient.Do(request)
+	httpResponse, err := client.httpClient.Do(request)
 	if err != nil {
 		return fmt.Errorf("Response error: %w", err)
 	}
