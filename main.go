@@ -20,19 +20,21 @@ func main() {
 	address := GetVaultAddress()
 	vaultClient = vault.NewVaultClient(address)
 
-	vaultState := WaitForVault()
+	vaultState := WaitForVault(func(d time.Duration) {
+		time.Sleep(d)
+	})
 
 	if vaultState.Uninitialized {
 		InitializeVault()
 	}
 }
 
-func WaitForVault() vault.HealthState {
+func WaitForVault(delay func(d time.Duration)) vault.HealthState {
 	for {
 		state, err := vaultClient.HealthCheck()
 		if err != nil {
 			log.Println(err)
-			time.Sleep(1 * time.Second)
+			delay(1 * time.Second)
 			continue
 		}
 
