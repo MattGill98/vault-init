@@ -20,10 +20,36 @@ func main() {
 		vaultAddr = DEFAULT_VAULT_ADDR
 	}
 
-	vaultClient := vault.NewVaultClient(vaultAddr)
+	vault := vault.NewVaultClient(vaultAddr)
+	configure(vault)
+}
+
+func configure(vault vault.Vault) {
+
+	initialize := func() {
+		log.Println("Initialising Vault...")
+
+		response, err := vault.Initialize()
+		if err != nil {
+			log.Fatalf("Initialization error: %q", err)
+		}
+
+		log.Println("Unsealing Vault...")
+		for index, key := range response.Keys {
+			event, err := vault.Unseal(key)
+			if err != nil {
+				log.Printf("Failed to unseal using key [%d]", index)
+				break
+			}
+			log.Printf("Unseal progress: [%d/%d]", event.KeysProvided, event.KeysRequired)
+			if !event.Sealed {
+				break
+			}
+		}
+	}
 
 	for {
-		state, err := vaultClient.HealthCheck()
+		state, err := vault.HealthCheck()
 		if err != nil {
 			log.Println(err)
 			time.Sleep(DEFAULT_CHECK_INTERVAL * time.Millisecond)
@@ -37,7 +63,7 @@ func main() {
 			log.Println("Vault is unsealed and in standby mode.")
 		case state.Uninitialized:
 			log.Println("Vault is not initialized.")
-			configure(vaultClient)
+			initialize()
 		case state.Sealed:
 			log.Println("Vault is sealed.")
 		default:
@@ -45,27 +71,5 @@ func main() {
 		}
 
 		break
-	}
-}
-
-func configure(vault vault.Vault) {
-	log.Println("Initialising Vault...")
-
-	response, err := vault.Initialize()
-	if err != nil {
-		log.Fatalf("Initialization error: %q", err)
-	}
-
-	log.Println("Unsealing Vault...")
-	for index, key := range response.Keys {
-		event, err := vault.Unseal(key)
-		if err != nil {
-			log.Printf("Failed to unseal using key [%d]", index)
-			break
-		}
-		log.Printf("Unseal progress: [%d/%d]", event.KeysProvided, event.KeysRequired)
-		if !event.Sealed {
-			break
-		}
 	}
 }
