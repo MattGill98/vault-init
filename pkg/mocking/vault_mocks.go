@@ -18,6 +18,6 @@ func (m *VaultMock) Initialize() (vault.InitState, error) {
 	return args.Get(0).(vault.InitState), args.Error(1)
 }
 func (m *VaultMock) Unseal(key string) (vault.UnsealState, error) {
-	args := m.Called()
+	args := m.Called(key)
 	return args.Get(0).(vault.UnsealState), args.Error(1)
 }

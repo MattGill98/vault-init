@@ -15,15 +15,21 @@ const (
 )
 
 var (
-	vaultClient vault.Vault
-	keyStorage  secret.KeyStorage
+	vaultClient             vault.Vault
+	keyStorage              secret.KeyStorage
+	createKubernetesStorage = func() (secret.KeyStorage, error) { return secret.NewKubernetesSecretStorage("vault-keys", "default") }
+	createInMemoryStorage   = func() secret.KeyStorage { return secret.NewMemorySecretStorage(log.Default()) }
 )
 
 func main() {
 	address := GetVaultAddress()
 	vaultClient = vault.NewVaultClient(address)
 
-	keyStorage = GetStorage()
+	storage, err := GetStorage()
+	if err != nil {
+		panic(err.Error())
+	}
+	keyStorage = storage
 
 	for {
 		ok, err := run()
@@ -42,26 +48,35 @@ func run() (bool, error) {
 	if vaultState.Uninitialized {
 		state, err := InitializeVault()
 		if err != nil {
-			panic(err.Error())
+			return false, err
 		}
-		UnsealVaultFromState(*state)
+		ok, err := SaveState(*state)
+		if !ok {
+			return false, err
+		}
+		ok, err = UnsealVaultFromState(*state)
+		if !ok {
+			return false, err
+		}
 	}
 
 	if vaultState.Sealed {
 		UnsealVault()
 	}
+
+	return true, nil
 }
 
-func GetStorage() secret.KeyStorage {
-	kubeStorage, err := secret.NewKubernetesSecretStorage("vault-keys", "default")
+func GetStorage() (secret.KeyStorage, error) {
+	kubeStorage, err := createKubernetesStorage()
 	if kubeStorage != nil {
-		return kubeStorage
+		return kubeStorage, nil
 	}
 	if err == secret.ErrNotInCluster {
 		log.Println("No Kubernetes environment detected")
-		return secret.NewMemorySecretStorage(log.Default())
+		return createInMemoryStorage(), nil
 	}
-	panic(err.Error())
+	return nil, err
 }
 
 func WaitForVault(delay func(d time.Duration)) vault.HealthState {
@@ -97,25 +112,23 @@ func InitializeVault() (*vault.InitState, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Initialization error: %w", err)
 	}
-
-	log.Println("Storing Vault keys...")
-	ok, err := keyStorage.Persist(state)
-	if !ok {
-		return nil, err
-	}
 	return &state, nil
 }
 
-func UnsealVault() {
-	state, err := keyStorage.Fetch()
-	if err != nil {
-		log.Printf("Failed to fetch keys: [%v]", err.Error())
-		return
-	}
-	UnsealVaultFromState(*state)
+func SaveState(state vault.InitState) (bool, error) {
+	log.Println("Storing Vault keys...")
+	return keyStorage.Persist(state)
 }
 
-func UnsealVaultFromState(state vault.InitState) {
+func UnsealVault() (bool, error) {
+	state, err := keyStorage.Fetch()
+	if err != nil {
+		return false, fmt.Errorf("Failed to fetch keys: %w", err)
+	}
+	return UnsealVaultFromState(*state)
+}
+
+func UnsealVaultFromState(state vault.InitState) (bool, error) {
 	log.Println("Unsealing Vault...")
 	for index, key := range state.Keys {
 		event, err := vaultClient.Unseal(key)
@@ -125,9 +138,10 @@ func UnsealVaultFromState(state vault.InitState) {
 		}
 		log.Printf("Unseal progress: [%d/%d]", event.KeysProvided, event.KeysRequired)
 		if !event.Sealed {
-			break
+			return true, nil
 		}
 	}
+	return false, fmt.Errorf("Too many unseal failures")
 }
 
 func GetVaultAddress() string {
