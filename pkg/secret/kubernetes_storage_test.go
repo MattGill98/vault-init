@@ -33,10 +33,11 @@ func TestGetSecretData(t *testing.T) {
 		secretName: "demo-secret",
 	}
 
-	data := storage.GetSecretData()
+	state, err := storage.Fetch()
 
-	assert.Equal(t, "abc", data.RootToken)
-	assert.Equal(t, []string{"a", "b", "c"}, data.Keys)
+	assert.Nil(t, err)
+	assert.Equal(t, "abc", state.RootToken)
+	assert.Equal(t, []string{"a", "b", "c"}, state.Keys)
 }
 
 func TestCreateSecret(t *testing.T) {
@@ -60,7 +61,7 @@ func TestCreateSecret(t *testing.T) {
 		secretName: "demo-secret",
 	}
 
-	ok, err := storage.CreateSecret(objectOptions{data: vault.InitState{Keys: []string{"a", "b", "c"}, RootToken: "abc"}})
+	ok, err := storage.Persist(vault.InitState{Keys: []string{"a", "b", "c"}, RootToken: "abc"})
 	assert.True(t, ok)
 	assert.Nil(t, err)
 

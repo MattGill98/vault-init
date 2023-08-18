@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -15,18 +16,28 @@ const (
 
 var (
 	vaultClient vault.Vault
+	keyStorage  secret.KeyStorage
 )
 
 func main() {
 	address := GetVaultAddress()
 	vaultClient = vault.NewVaultClient(address)
+	keyStorage = GetStorage()
 
 	vaultState := WaitForVault(func(d time.Duration) {
 		time.Sleep(d)
 	})
 
 	if vaultState.Uninitialized {
-		InitializeVault()
+		state, err := InitializeVault()
+		if err != nil {
+			panic(err.Error())
+		}
+		UnsealVaultFromState(*state)
+	}
+
+	if vaultState.Sealed {
+		UnsealVault()
 	}
 }
 
@@ -68,18 +79,32 @@ func WaitForVault(delay func(d time.Duration)) vault.HealthState {
 	}
 }
 
-func InitializeVault() {
+func InitializeVault() (*vault.InitState, error) {
 	log.Println("Initialising Vault...")
 
 	state, err := vaultClient.Initialize()
 	if err != nil {
-		log.Printf("Initialization error: %q", err)
-		return
+		return nil, fmt.Errorf("Initialization error: %w", err)
 	}
 
 	log.Println("Storing Vault keys...")
-	GetStorage().Persist(state)
+	ok, err := keyStorage.Persist(state)
+	if !ok {
+		return nil, err
+	}
+	return &state, nil
+}
 
+func UnsealVault() {
+	state, err := keyStorage.Fetch()
+	if err != nil {
+		log.Printf("Failed to fetch keys: [%v]", err.Error())
+		return
+	}
+	UnsealVaultFromState(*state)
+}
+
+func UnsealVaultFromState(state vault.InitState) {
 	log.Println("Unsealing Vault...")
 	for index, key := range state.Keys {
 		event, err := vaultClient.Unseal(key)

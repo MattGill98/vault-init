@@ -3,6 +3,7 @@ package secret
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	b64 "encoding/base64"
@@ -41,31 +42,7 @@ func NewKubernetesSecretStorage(secretName string, namespace string) (KeyStorage
 	}, nil
 }
 
-func (kubernetes *KubernetesSecretStorage) Persist(state vault.InitState) {
-	ok, err := kubernetes.CreateSecret(objectOptions{
-		dryRun: false,
-		data:   state,
-	})
-	if !ok {
-		panic(err.Error())
-	}
-}
-
-func (kubernetes *KubernetesSecretStorage) Fetch() vault.InitState {
-	return kubernetes.GetSecretData()
-}
-
-type objectOptions struct {
-	dryRun bool
-	data   vault.InitState
-}
-
-func (kubernetes *KubernetesSecretStorage) CreateSecret(options objectOptions) (bool, error) {
-	dryRunOptions := []string{}
-	if options.dryRun {
-		dryRunOptions = append(dryRunOptions, metav1.DryRunAll)
-	}
-
+func (kubernetes *KubernetesSecretStorage) Persist(state vault.InitState) (bool, error) {
 	ctx := context.Background()
 
 	_, err := kubernetes.clientset.CoreV1().Secrets(kubernetes.namespace).Create(ctx,
@@ -74,27 +51,23 @@ func (kubernetes *KubernetesSecretStorage) CreateSecret(options objectOptions) (
 				Name:      kubernetes.secretName,
 				Namespace: kubernetes.namespace,
 			},
-			Data: encodeData(options.data),
+			Data: encodeData(state),
 		},
-		metav1.CreateOptions{
-			DryRun: dryRunOptions,
-		})
+		metav1.CreateOptions{})
 
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+	return err == nil, err
 }
 
-func (kubernetes *KubernetesSecretStorage) GetSecretData() vault.InitState {
+func (kubernetes *KubernetesSecretStorage) Fetch() (*vault.InitState, error) {
 	ctx := context.Background()
 
 	secret, err := kubernetes.clientset.CoreV1().Secrets(kubernetes.namespace).Get(ctx, kubernetes.secretName, metav1.GetOptions{})
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("Failed to fetch secret data")
 	}
 
-	return decodeData(secret.Data)
+	state := decodeData(secret.Data)
+	return &state, nil
 }
 
 func encodeData(input vault.InitState) map[string][]byte {
