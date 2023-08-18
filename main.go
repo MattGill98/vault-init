@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/mattgill98/vault-init/pkg/secret"
@@ -15,6 +16,8 @@ const (
 )
 
 var (
+	address                 = GetVaultAddress()
+	debugLogging            = GetDebugLogging()
 	vaultClient             vault.Vault
 	keyStorage              secret.KeyStorage
 	createKubernetesStorage = func() (secret.KeyStorage, error) { return secret.NewKubernetesSecretStorage("vault-keys", "default") }
@@ -22,7 +25,6 @@ var (
 )
 
 func main() {
-	address := GetVaultAddress()
 	vaultClient = vault.NewVaultClient(address)
 
 	storage, err := GetStorage()
@@ -88,17 +90,19 @@ func WaitForVault(delay func(d time.Duration)) vault.HealthState {
 			continue
 		}
 
-		switch true {
-		case state.Active:
-			log.Println("Vault is initialized and unsealed.")
-		case state.Standby:
-			log.Println("Vault is unsealed and in standby mode.")
-		case state.Uninitialized:
-			log.Println("Vault is not initialized.")
-		case state.Sealed:
-			log.Println("Vault is sealed.")
-		default:
-			log.Printf("Vault is in an unknown state. Status code: %d", state.StatusCode)
+		if debugLogging == true {
+			switch true {
+			case state.Active:
+				log.Println("Vault is initialized and unsealed.")
+			case state.Standby:
+				log.Println("Vault is unsealed and in standby mode.")
+			case state.Uninitialized:
+				log.Println("Vault is not initialized.")
+			case state.Sealed:
+				log.Println("Vault is sealed.")
+			default:
+				log.Printf("Vault is in an unknown state. Status code: %d", state.StatusCode)
+			}
 		}
 
 		return state
@@ -151,4 +155,9 @@ func GetVaultAddress() string {
 	}
 	log.Printf("VAULT_ADDR not set, defaulting to %q", DEFAULT_VAULT_ADDR)
 	return DEFAULT_VAULT_ADDR
+}
+
+func GetDebugLogging() bool {
+	value := os.Getenv("DEBUG")
+	return strings.EqualFold(value, "true")
 }
