@@ -22,8 +22,19 @@ var (
 func main() {
 	address := GetVaultAddress()
 	vaultClient = vault.NewVaultClient(address)
+
 	keyStorage = GetStorage()
 
+	for {
+		ok, err := run()
+		if !ok {
+			panic(err.Error())
+		}
+		time.Sleep(5 * time.Second)
+	}
+}
+
+func run() (bool, error) {
 	vaultState := WaitForVault(func(d time.Duration) {
 		time.Sleep(d)
 	})
