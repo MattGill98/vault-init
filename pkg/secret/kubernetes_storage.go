@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	b64 "encoding/base64"
 	"encoding/json"
 
 	"github.com/mattgill98/vault-init/pkg/vault"
@@ -108,31 +107,18 @@ func (kubernetes *KubernetesSecretStorage) Fetch() (*vault.InitState, error) {
 }
 
 func encodeData(input vault.InitState) map[string][]byte {
-	encoder := b64.StdEncoding.Strict()
-
 	rootKeyBytes := []byte(input.RootToken)
-	encodedRootKeyBytes := []byte(encoder.EncodeToString(rootKeyBytes))
-
 	unsealKeysBytes := []byte(arrayToString(input.Keys))
-	encodedUnsealKeysBytes := []byte(encoder.EncodeToString(unsealKeysBytes))
 
 	return map[string][]byte{
-		"root_key":    encodedRootKeyBytes,
-		"unseal_keys": encodedUnsealKeysBytes,
+		"root_key":    rootKeyBytes,
+		"unseal_keys": unsealKeysBytes,
 	}
 }
 
 func decodeData(input map[string][]byte) vault.InitState {
-	encoder := b64.StdEncoding.Strict()
-
-	rootKey, err := encoder.DecodeString(string(input["root_key"]))
-	if err != nil {
-		panic(err)
-	}
-	unsealKeys, err := encoder.DecodeString(string(input["unseal_keys"]))
-	if err != nil {
-		panic(err)
-	}
+	rootKey := string(input["root_key"])
+	unsealKeys := string(input["unseal_keys"])
 
 	return vault.InitState{
 		RootToken: string(rootKey),

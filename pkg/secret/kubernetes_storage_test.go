@@ -3,8 +3,6 @@ package secret
 import (
 	"testing"
 
-	b64 "encoding/base64"
-
 	"github.com/mattgill98/vault-init/pkg/vault"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -13,15 +11,14 @@ import (
 )
 
 func TestGetSecretData(t *testing.T) {
-	encoder := b64.StdEncoding.Strict()
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "demo-secret",
 			Namespace: "demo",
 		},
 		Data: map[string][]byte{
-			"root_key":    []byte(encoder.EncodeToString([]byte("abc"))),
-			"unseal_keys": []byte(encoder.EncodeToString([]byte("a,b,c"))),
+			"root_key":    []byte([]byte("abc")),
+			"unseal_keys": []byte([]byte("a,b,c")),
 		},
 	}
 
@@ -41,15 +38,14 @@ func TestGetSecretData(t *testing.T) {
 }
 
 func TestUpdateSecret(t *testing.T) {
-	encoder := b64.StdEncoding.Strict()
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "demo-secret",
 			Namespace: "demo",
 		},
 		Data: map[string][]byte{
-			"root_key":    []byte(encoder.EncodeToString([]byte("abc"))),
-			"unseal_keys": []byte(encoder.EncodeToString([]byte("a,b,c"))),
+			"root_key":    []byte([]byte("abc")),
+			"unseal_keys": []byte([]byte("a,b,c")),
 		},
 	}
 
