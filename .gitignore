@@ -9,3 +9,7 @@
 
 # Go workspace file
 go.work
+
+# Helm charts
+**/charts/*
+
