@@ -40,7 +40,7 @@ func TestGetSecretData(t *testing.T) {
 	assert.Equal(t, []string{"a", "b", "c"}, state.Keys)
 }
 
-func TestCreateSecret(t *testing.T) {
+func TestUpdateSecret(t *testing.T) {
 	encoder := b64.StdEncoding.Strict()
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -53,7 +53,7 @@ func TestCreateSecret(t *testing.T) {
 		},
 	}
 
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewSimpleClientset(&secret)
 
 	storage := KubernetesSecretStorage{
 		clientset:  clientset,
